@@ -64,3 +64,46 @@ rules =  rules.sort_values(by='lift', ascending=False)
 #cleaning up display by showing only key columns 
 print(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].head(10)) 
 
+#converting frozensets to strings for better readability
+#converting apriori to plain tex: "Item"
+rules['ant_str'] = rules['antecedents'].apply(lambda x: ', '.join(list(x)))
+rules['con_str'] = rules['consequents'].apply(lambda x: ', '.join(list(x)))
+
+#visuals: scatter plots of all rules
+plt.figure(figsize=(10, 6))
+sns.scatterplot(
+    x="support",
+    y="confidence",
+    size="lift",
+    hue="lift",    data=rules,
+    palette="viridis",
+    sizes=(20, 200)
+)
+
+plt.title('Market Basket Analysis: Support vs Confidence (Color =  Lift)')
+plt.xlabel('Support (Popularity)')
+plt.ylabel('Confidence (Likelihood)')
+plt.legend(bbox_to_anchor=(1.01, 1),
+           loc='upper left')
+plt.show()
+
+#visuals: Heatmap of the Top 15 Strongest Rules
+#pivoting to data to create a matrix
+#rows = Fist Item (Anecedent), Cols = Second Item (Consequent), Value = Lift
+top_rules = rules.sort_values(by='lift', ascending=False).head(15)
+
+#creating a matrix for the heatmap
+pivot = top_rules.pivot(index='ant_str', columns='con_str', values='lift')
+
+#visuals 
+plt.figure(figsize=(10, 8))
+sns.heatmap(pivot, annot=True,
+            cmap="Reds",
+            fmt=".1f")
+plt.title('Top 15 Association rules (Heatmap by Lift)')
+plt.xlabel('Consequent (Buy This Next)')
+plt.ylabel('Antecedent (If you buy this now..)')
+plt.yticks(rotation=0)
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+plt.show() 
