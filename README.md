@@ -20,4 +20,5 @@ The Solution:
 
 Contact
 - Name: Chukwuemeka Eugene Obiyo
+- Email: praise609@gmail.com
 - Linkedin: https://www.linkedin.com/in/chukwuemekao/
