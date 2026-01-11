@@ -107,3 +107,104 @@ plt.yticks(rotation=0)
 plt.xticks(rotation=45, ha='right')
 plt.tight_layout()
 plt.show() 
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+#using one of the most popular items: 'rabbit Night Light'
+target_item = 'RABBIT NIGHT LIGHT'
+
+#creating customer level dataset
+#grouping by CustomerID
+customer_data = france_subset.groupby('CustomerID').agg({
+    'InvoiceNo': 'nunique', #how many visits (frequency)
+    'Quantity': 'sum', #total items bought (volume)
+    'Description': 'nunique' #how many distinct products (variety)
+}).rename(columns={
+    'InvoiceNo': 'Frequency',
+    'Quantity': 'TotalVolume',
+    'Description': 'Variety'
+})
+
+#creating target column (did they buy rhe rabbit)
+rabbit_buyers = france_subset[france_subset['Description'] == target_item]['CustomerID'].unique()
+
+#creating new column: 'Target', 1 if they are in the rabbit_buyers list, 0 if not
+customer_data['Target'] = customer_data.index.isin(rabbit_buyers).astype(int)
+print(f"Dataset Shape: {customer_data.shape}")
+print(customer_data.head())
+print("\nTarget Distribution:")
+print(customer_data['Target'].value_counts()) 
+
+#training the Prophet
+#spliting data
+x = customer_data[['Frequency', 'TotalVolume', 'Variety']]
+y = customer_data['Target']
+x_train, x_test, y_train, y_test = train_test_split(x,y, test_size=0.3, random_state=42) 
+
+#training the Prophet
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_model.fit(x_train, y_train)
+
+#prediction and evaluation
+y_pred = rf_model.predict(x_test)
+print("--- Propensity Model Performance ---")
+print(classification_report(y_test, y_pred)) 
+
+#Feature Importance
+importance = pd.DataFrame({
+    'Feature': x.columns,
+    'Importance': rf_model.feature_importances_
+}).sort_values(by='Importance', ascending=False)
+
+print("\n--- What drives the purchase? ---")
+print(importance) 
+
+#creating a prediction for a fake customer (potential prediction)
+def predict_rabbit_potential(frequency, volume, variety):
+    #creating a dataframe for the new user data
+    new_retail = pd.DataFrame([[frequency, volume, variety]], 
+                            columns=['Frequency', 'TotalVolume', 'Variety'])
+    
+    #prediction (0 or 1)
+    prediction = rf_model.predict(new_retail)[0]
+    probability = rf_model.predict_proba(new_retail)[0][1] # Probability of being class 1
+    
+    if prediction == 1:
+        return f"High Potential! (Probability: {probability:.2%}). Send them an ad!"
+    else:
+        return f"Low Potential (Probability: {probability:.2%}). Save the ad money!"
+
+#testing on fake customers
+#customer A: Shopped once, bought 5 items (Newbie)
+print(f"Customer A: {predict_rabbit_potential(1, 5, 5)}")
+
+#customer B: Shopped 10 times, bought 500 items (Power User)
+print(f"Customer B: {predict_rabbit_potential(10, 500, 120)}")
+
+#creating visuals: feature importance and confusion matrix
+#feature importance visuals
+plt.figure(figsize=(8,5))
+#using the 'importance' dataframe
+sns.barplot(x='Importance', y='Feature', data=importance, palette='viridis')
+plt.title('What Drives a "Rabbit Night Light" Purchase')
+plt.xlabel('Importance Score')
+plt.ylabel('Customer Behavior')
+plt.show()
+
+from sklearn.metrics import confusion_matrix
+#confusion matrix visuals
+#calculating the matrix
+cm = confusion_matrix(y_test, y_pred)
+
+#plots
+plt.figure(figsize=(6,5))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
+            xticklabels=['Predicted: No', 'Predicted: Yes'],
+            yticklabels=['Actual: No', 'Actual: Yes'])
+plt.title('Propensity Model Performance')
+plt.xlabel('Model Prediction')
+plt.ylabel('Truth')
+plt.show()
+
